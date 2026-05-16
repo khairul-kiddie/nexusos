@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
@@ -7,6 +8,8 @@ import {
   LayoutDashboard, Cpu, Share2, ShieldCheck, Activity, Zap
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { api } from "@/lib/api";
+import type { EcosystemStats } from "@/types/ecosystem";
 
 const NAV_ITEMS = [
   { href: "/", icon: LayoutDashboard, label: "Dashboard", shortLabel: "Dash" },
@@ -15,8 +18,31 @@ const NAV_ITEMS = [
   { href: "/governance", icon: ShieldCheck, label: "Governance", shortLabel: "Gov" },
 ];
 
+const FALLBACK_STATS = { startups: "247", mentors: "89", programmes: "34", health: 72.4 };
+
 export function Sidebar() {
   const pathname = usePathname();
+  const [liveStats, setLiveStats] = useState<typeof FALLBACK_STATS>(FALLBACK_STATS);
+
+  const fetchStats = useCallback(async () => {
+    try {
+      const data: EcosystemStats = await api.getEcosystemStats();
+      setLiveStats({
+        startups: String(data.totalStartups),
+        mentors: String(data.activeMentors),
+        programmes: String(data.programmesAvailable),
+        health: 72.4,
+      });
+    } catch {
+      // Keep fallback values
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchStats();
+    const interval = setInterval(fetchStats, 60_000);
+    return () => clearInterval(interval);
+  }, [fetchStats]);
 
   return (
     <aside className="w-64 h-screen flex flex-col glass border-r border-white/[0.06] shrink-0 z-20">
@@ -90,9 +116,9 @@ export function Sidebar() {
       <div className="p-4 border-t border-white/[0.06] space-y-3">
         <div className="text-[10px] font-semibold tracking-widest text-slate-600 uppercase px-1 mb-1">Live Metrics</div>
         {[
-          { label: "Startups", value: "247", color: "text-accent-cyan" },
-          { label: "Mentors", value: "89", color: "text-accent-purple" },
-          { label: "Programmes", value: "34", color: "text-accent-amber" },
+          { label: "Startups", value: liveStats.startups, color: "text-accent-cyan" },
+          { label: "Mentors", value: liveStats.mentors, color: "text-accent-purple" },
+          { label: "Programmes", value: liveStats.programmes, color: "text-accent-amber" },
         ].map((stat) => (
           <div key={stat.label} className="flex items-center justify-between px-2">
             <span className="text-xs text-slate-500">{stat.label}</span>
@@ -102,13 +128,13 @@ export function Sidebar() {
         <div className="pt-2">
           <div className="flex items-center justify-between mb-1">
             <span className="text-xs text-slate-500">Ecosystem Health</span>
-            <span className="text-xs font-mono text-accent-amber">72.4%</span>
+            <span className="text-xs font-mono text-accent-amber">{liveStats.health.toFixed(1)}%</span>
           </div>
           <div className="h-1 bg-white/[0.06] rounded-full overflow-hidden">
             <motion.div
               className="h-full bg-gradient-to-r from-accent-amber to-accent-green rounded-full"
               initial={{ width: 0 }}
-              animate={{ width: "72.4%" }}
+              animate={{ width: `${liveStats.health}%` }}
               transition={{ duration: 1.5, delay: 0.5 }}
             />
           </div>
@@ -119,7 +145,7 @@ export function Sidebar() {
       <div className="p-4 border-t border-white/[0.06]">
         <div className="flex items-center gap-2">
           <Activity className="w-3.5 h-3.5 text-slate-600" />
-          <span className="text-xs text-slate-600">89 connections formed today</span>
+          <span className="text-xs text-slate-600">AI-powered · auto-refresh 60s</span>
         </div>
       </div>
     </aside>

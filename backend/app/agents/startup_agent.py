@@ -15,46 +15,40 @@ class StartupIntelligenceAgent(BaseAgent):
         startup = context.get("startup_profile", DEMO_STARTUP.model_dump())
         query = context.get("query", "")
 
+        target_markets = startup.get("target_markets", ["Malaysia"])
         fallback = {
-            "startup_id": startup.get("id", "startup-healthai-001"),
-            "readiness_score": 78.5,
-            "industry_classification": "AI-Enabled Digital Health (MedTech + SaaS)",
-            "maturity_level": "Early Revenue / Pre-Series A",
-            "market_readiness": {
-                "Malaysia": 0.85,
-                "Indonesia": 0.62,
-                "Singapore": 0.78,
-                "Thailand": 0.55,
-            },
+            "startup_id": startup.get("id", "startup-001"),
+            "readiness_score": 72.0,
+            "industry_classification": startup.get("industry", "Technology"),
+            "maturity_level": startup.get("stage", "Early Stage"),
+            "market_readiness": {m: 0.65 for m in target_markets},
             "ecosystem_pathways": [
-                "Apply for MDEC GAIN Grant to fund Indonesia market entry costs",
-                "Engage Ahmad Fauzi for BPOM regulatory navigation and MoH relationships",
-                "Partner with Universiti Indonesia for clinical validation study",
+                f"Engage mentors with expertise in {startup.get('industry', 'your sector')} and target market entry",
+                "Apply for MDEC GAIN Grant to fund market expansion costs",
                 "Join MaGIC Global Accelerator for ASEAN network access",
-                "Initiate pilot with 2–3 Indonesian hospital groups in Q3 2025",
+                "Identify strategic local partners in target markets",
+                "Engage CRADLE or MRANTI for R&D grant funding",
             ],
             "strategic_insights": [
-                "Indonesia represents a 270M population opportunity with <5% AI diagnostic penetration",
-                "BPOM Class II medical device registration takes 12–18 months — start immediately",
-                "Hospital procurement cycles in Indonesia average 9 months — build government channel",
-                "Local clinical data for FHIR compliance is mandatory for Indonesian market",
-                "JKN integration (national health insurance) is a GTM unlock for scale",
+                f"Malaysia's {startup.get('industry', 'tech')} ecosystem is maturing with active government support",
+                "MDEC and MaGIC offer dedicated programmes for startups targeting ASEAN expansion",
+                "Local partnerships accelerate regulatory approval and enterprise sales cycles",
+                "Non-dilutive grant funding from CRADLE/MDEC can extend runway significantly",
             ],
             "expansion_risks": [
-                "Regulatory lag: BPOM approval timeline may delay market entry",
-                "Data sovereignty requirements under Indonesia's PDP Law",
-                "Currency risk and payment infrastructure gaps in Tier 2 cities",
-                "Strong local competition from Halodoc and Alodokter",
+                "Regulatory requirements vary significantly across ASEAN markets",
+                "Local competition may have established distribution and government relationships",
+                "Currency and payment infrastructure differences across target markets",
+                "Talent acquisition in competitive tech markets",
             ],
-            "tech_stack_alignment": "Strong — FHIR/HL7 compliance is critical differentiator for hospital integrations",
-            "funding_trajectory": "Well-positioned for Seed extension or Pre-Series A in 12 months post Indonesia validation",
+            "tech_stack_alignment": f"Assess alignment of {startup.get('tech_stack', ['technology'])} with target market infrastructure",
+            "funding_trajectory": f"Well-positioned for next funding round with ecosystem support — target markets: {', '.join(target_markets)}",
             "reasoning": (
-                "HealthAI Solutions demonstrates strong product-market fit in Malaysia with proven clinical outcomes "
-                "(40% error reduction). The Indonesia expansion thesis is sound given demographic tailwinds, low AI penetration, "
-                "and recent Jokowi-era digital health mandates. Primary risk is regulatory — BPOM classification and PDP Law "
-                "compliance must be addressed before market entry. Recommend parallel-tracking regulatory engagement and "
-                "clinical partnership with UI Jakarta to build local evidence base. The team's FHIR expertise is a rare "
-                "differentiator that opens hospital procurement pathways unavailable to consumer-first competitors."
+                f"{startup.get('name', 'The startup')} is pursuing {query}. "
+                f"With a {startup.get('stage', 'early')} stage profile in {startup.get('industry', 'technology')}, "
+                "the NexusOS ecosystem can provide mentor matching, grant access, and programme connections "
+                "to accelerate this objective. Key success factors include securing non-dilutive funding, "
+                "engaging market-specialist mentors, and leveraging Malaysia's innovation infrastructure."
             ),
         }
 

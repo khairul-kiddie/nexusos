@@ -16,85 +16,74 @@ class RelationshipMemoryAgent(BaseAgent):
         startup = context.get("startup_profile", {})
         query = context.get("query", "")
 
-        # fallback = {
-        #     "relevant_memories": [
-        #         {
-        #             "memory_id": "mem-001",
-        #             "type": "mentor_collaboration",
-        #             "entity": "Dr. Sarah Chen",
-        #             "event": "Led market entry strategy for DiagnostiQ (similar AI diagnostic startup)",
-        #             "outcome": "Successful Malaysia-to-Indonesia expansion, 6 hospital partnerships signed",
-        #             "date": "2024-08-15",
-        #             "trust_delta": +0.05,
-        #             "collaboration_quality": 0.92,
-        #             "relevance_score": 0.94,
-        #             "insight": "Dr. Chen's methodology for hospital partnership sequencing (start with private, then public) proved highly effective in the Indonesian market",
-        #         },
-        #         {
-        #             "memory_id": "mem-003",
-        #             "type": "regulatory_navigation",
-        #             "entity": "Ahmad Fauzi",
-        #             "event": "BPOM Class II approval facilitation for MedScan AI",
-        #             "outcome": "Approval obtained in 11 months (vs. typical 18 months) — 39% faster",
-        #             "date": "2024-11-05",
-        #             "trust_delta": +0.08,
-        #             "collaboration_quality": 0.95,
-        #             "relevance_score": 0.97,
-        #             "insight": "Fauzi's pre-submission BPOM consultation approach saved 7 months of revision cycles. Pre-submission meeting is now standard recommendation.",
-        #         },
-        #         {
-        #             "memory_id": "mem-002",
-        #             "type": "grant_success",
-        #             "entity": "MDEC GAIN Grant",
-        #             "event": "Grant awarded to HealthSync — AI patient monitoring company",
-        #             "outcome": "Full RM 500K awarded, Indonesia pilot launched within 90 days of approval",
-        #             "date": "2024-09-20",
-        #             "trust_delta": 0.0,
-        #             "collaboration_quality": 0.88,
-        #             "relevance_score": 0.89,
-        #             "insight": "MDEC fast-tracked companies with clinical validation data. HealthAI should prioritize collecting and presenting clinical outcome metrics.",
-        #         },
-        #         {
-        #             "memory_id": "mem-004",
-        #             "type": "programme_outcome",
-        #             "entity": "MaGIC Global Accelerator Alumni",
-        #             "event": "ClinicalAI completed MaGIC cohort 2024",
-        #             "outcome": "Raised Series A of USD 3.2M within 8 months of graduation",
-        #             "date": "2025-01-10",
-        #             "trust_delta": 0.0,
-        #             "collaboration_quality": 0.90,
-        #             "relevance_score": 0.85,
-        #             "insight": "MaGIC graduates with Indonesia pilots receive premium valuation in SEA VC market. Indonesia traction is the key fundraising differentiator.",
-        #         },
-        #     ],
-        #     "trust_network_insights": {
-        #         "high_trust_nodes": ["Dr. Sarah Chen (0.94)", "Ahmad Fauzi (0.91)", "MDEC GAIN (0.88)"],
-        #         "trust_trajectory": "Positive — all recommended mentors have improving trust scores over 12 months",
-        #         "ecosystem_memory_depth": "24 months of collaboration history available",
-        #         "similar_startup_outcomes": [
-        #             "DiagnostiQ: Malaysia → Indonesia expansion in 8 months with Chen mentorship",
-        #             "MedScan AI: BPOM approval in 11 months with Fauzi guidance",
-        #             "ClinicalAI: Series A raised post-MaGIC with Indonesia traction",
-        #         ],
-        #     },
-        #     "memory_synthesis": (
-        #         "Ecosystem memory reveals a proven playbook for AI healthcare startups expanding to Indonesia from Malaysia: "
-        #         "(1) Engage Fauzi for BPOM pre-submission consultation immediately — saves 7+ months; "
-        #         "(2) Use Dr. Chen's hospital sequencing methodology (private → public); "
-        #         "(3) Apply MDEC GAIN with clinical validation data front-and-center; "
-        #         "(4) Join MaGIC to build Indonesia credibility before Series A. "
-        #         "This playbook has been validated by 3 similar companies in the last 24 months."
-        #     ),
-        #     "collaboration_quality_avg": 0.91,
-        #     "memory_confidence": 0.93,
-        #     "reasoning": (
-        #         "The relationship memory database contains directly applicable precedents for HealthAI's situation. "
-        #         "Three startups with near-identical profiles (AI diagnostic tools, Malaysia base, Indonesia target) "
-        #         "have navigated this exact path in the last 2 years. Their combined experience forms a high-confidence "
-        #         "playbook. The ecosystem memory's trust-weighting ensures recommendations from high-quality past collaborations "
-        #         "are surfaced over lower-quality historical data. Confidence level: 93%."
-        #     ),
-        # }
+        industry = startup.get("industry", "technology")
+        startup_name = startup.get("name", "the startup")
+        target_markets = startup.get("target_markets", ["Malaysia"])
+        fallback = {
+            "relevant_memories": [
+                {
+                    "memory_id": "mem-001",
+                    "type": "mentor_collaboration",
+                    "entity": "Dr. Sarah Chen",
+                    "event": f"Led market entry strategy for a {industry} startup expanding into ASEAN",
+                    "outcome": "Successful market entry, key partnerships established within 8 months",
+                    "date": "2024-08-15",
+                    "trust_delta": 0.05,
+                    "collaboration_quality": 0.92,
+                    "relevance_score": 0.88,
+                    "insight": "Strategic market sequencing and local partnership development proved critical for ASEAN expansion success",
+                },
+                {
+                    "memory_id": "mem-002",
+                    "type": "grant_success",
+                    "entity": "MDEC GAIN Grant",
+                    "event": f"Grant awarded to a {industry} company for ASEAN market expansion",
+                    "outcome": "Full RM 500K awarded, market entry initiated within 90 days of approval",
+                    "date": "2024-09-20",
+                    "trust_delta": 0.0,
+                    "collaboration_quality": 0.88,
+                    "relevance_score": 0.85,
+                    "insight": "MDEC fast-tracked applications with clear market traction data and well-defined expansion plans",
+                },
+                {
+                    "memory_id": "mem-003",
+                    "type": "programme_outcome",
+                    "entity": "MaGIC Global Accelerator Alumni",
+                    "event": f"A {industry} startup completed MaGIC 2024 cohort",
+                    "outcome": "Raised Series A within 10 months of graduation leveraging MaGIC network",
+                    "date": "2025-01-10",
+                    "trust_delta": 0.0,
+                    "collaboration_quality": 0.90,
+                    "relevance_score": 0.82,
+                    "insight": "MaGIC graduates with demonstrated ASEAN market traction receive stronger VC interest in SEA fundraising rounds",
+                },
+            ],
+            "trust_network_insights": {
+                "high_trust_nodes": ["Dr. Sarah Chen (0.94)", "Ahmad Fauzi (0.91)", "MDEC GAIN (0.88)"],
+                "trust_trajectory": "Positive — all recommended mentors have improving trust scores over 12 months",
+                "ecosystem_memory_depth": "24 months of collaboration history available",
+                "similar_startup_outcomes": [
+                    f"Multiple {industry} startups have successfully used MDEC GAIN for ASEAN expansion",
+                    f"MaGIC accelerator alumni in {industry} have strong Series A conversion rates",
+                    f"Mentor-guided market entry in {', '.join(target_markets)} reduces time-to-partnership by ~40%",
+                ],
+            },
+            "memory_synthesis": (
+                f"Ecosystem memory surfaces a relevant playbook for {startup_name} pursuing: '{query}'. "
+                f"Key patterns from similar {industry} journeys: "
+                "(1) Engage specialised mentors early for market-specific regulatory and partnership navigation; "
+                "(2) Apply MDEC GAIN with clear expansion metrics and market validation data; "
+                "(3) Leverage MaGIC network for ASEAN credibility before fundraising. "
+                "These patterns have been validated across multiple ecosystem journeys in the last 24 months."
+            ),
+            "collaboration_quality_avg": 0.90,
+            "memory_confidence": 0.85,
+            "reasoning": (
+                f"The relationship memory database has been searched for precedents relevant to {startup_name}'s query. "
+                f"Historical patterns from {industry} and adjacent sectors in the Malaysian ecosystem inform these recommendations. "
+                "Trust-weighted scoring ensures high-quality past collaborations surface over lower-quality data."
+            ),
+        }
 
         result = await self.gemini.generate_structured(
             system_prompt=SYSTEM_PROMPT,

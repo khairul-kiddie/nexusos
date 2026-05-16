@@ -15,70 +15,70 @@ class MentorIntelligenceAgent(BaseAgent):
         startup = context.get("startup_profile", DEMO_STARTUP.model_dump())
         query = context.get("query", "")
 
+        industry = startup.get("industry", "technology")
+        target_markets = startup.get("target_markets", ["Malaysia"])
+        startup_name = startup.get("name", "the startup")
         fallback = {
             "ranked_mentors": [
                 {
                     "mentor_id": "mentor-001",
                     "name": "Dr. Sarah Chen",
-                    "compatibility_score": 0.96,
+                    "compatibility_score": 0.82,
                     "trust_weighted_rank": 1,
                     "expertise_alignment": [
-                        "AI/ML healthcare applications",
+                        f"AI/ML applications in {industry}",
                         "ASEAN market expansion strategy",
-                        "Digital health regulatory frameworks",
-                        "Hospital system integration",
+                        "Regulatory frameworks across SEA",
+                        "Strategic partnerships and enterprise sales",
                     ],
-                    "market_fit": ["Indonesia", "Malaysia", "Singapore"],
+                    "market_fit": target_markets,
                     "why_selected": (
-                        "Dr. Chen's 18 years in digital health combined with successful IHH Digital expansion "
-                        "across 6 ASEAN markets makes her the highest-value mentor for HealthAI's Indonesia push. "
-                        "Her trust score of 0.94 reflects 3 verified successful mentorships in the healthcare AI space. "
-                        "Specific value: regulatory pathway knowledge and C-suite hospital relationships in Indonesia."
+                        f"Dr. Chen's broad ASEAN market experience and AI/ML expertise provide strong strategic value "
+                        f"for {startup_name}'s expansion objectives. Her trust score of 0.94 reflects consistent "
+                        "mentorship quality across multiple sectors and markets."
                     ),
-                    "engagement_recommendation": "Schedule bi-weekly strategic sessions focused on Indonesia GTM and regulatory timeline",
+                    "engagement_recommendation": f"Schedule strategic sessions focused on {', '.join(target_markets)} market entry and regulatory landscape",
                     "estimated_time_to_value": "2-4 weeks",
                 },
                 {
                     "mentor_id": "mentor-002",
                     "name": "Ahmad Fauzi",
-                    "compatibility_score": 0.91,
+                    "compatibility_score": 0.78,
                     "trust_weighted_rank": 2,
                     "expertise_alignment": [
-                        "BPOM regulatory navigation",
-                        "Kemenkes (MoH Indonesia) relationships",
-                        "Healthcare policy and JKN integration",
-                        "Government procurement channels",
+                        "Malaysian market entry and government relations",
+                        "Regulatory navigation across SEA",
+                        "Government and institutional partnerships",
+                        "Cross-border business development",
                     ],
-                    "market_fit": ["Indonesia"],
+                    "market_fit": ["Malaysia", "Indonesia"],
                     "why_selected": (
-                        "Ahmad's former role as Director at Kemenkes makes him irreplaceable for navigating Indonesian "
-                        "government channels. His BPOM expertise directly addresses HealthAI's highest-priority risk. "
-                        "Track record: 8 foreign health-tech market entries facilitated. Trust score 0.91 verified "
-                        "through 4 ecosystem collaborations."
+                        f"Ahmad's deep government and regulatory networks are valuable for {startup_name} navigating "
+                        f"the Malaysian ecosystem. His track record of facilitating foreign company market entries "
+                        "makes him a key resource for regulatory and partnership acceleration."
                     ),
-                    "engagement_recommendation": "Immediate engagement for BPOM Class II application strategy",
-                    "estimated_time_to_value": "1-2 weeks",
+                    "engagement_recommendation": "Engage for regulatory strategy and government relationship mapping",
+                    "estimated_time_to_value": "1-3 weeks",
                 },
                 {
                     "mentor_id": "mentor-003",
                     "name": "Priya Menon",
-                    "compatibility_score": 0.88,
+                    "compatibility_score": 0.75,
                     "trust_weighted_rank": 3,
                     "expertise_alignment": [
-                        "Series A fundraising strategy",
-                        "HealthTech VC landscape in SEA",
-                        "Clinical validation for investor readiness",
-                        "Board governance and metrics",
+                        "Fundraising and investor relations",
+                        "SEA venture capital landscape",
+                        "Product-market fit validation",
+                        "Growth strategy and board governance",
                     ],
-                    "market_fit": ["SEA", "India", "US"],
+                    "market_fit": ["SEA", "Malaysia", "Singapore"],
                     "why_selected": (
-                        "Priya's dual role as active VC and former McKinsey health consultant provides unique value "
-                        "for HealthAI's fundraising preparation. Her $120M deployment in health-tech means she understands "
-                        "what investors want to see from Indonesia expansion. Secondary benefit: warm introductions to "
-                        "co-investors in the Openspace portfolio network."
+                        f"Priya's VC background and SEA investment expertise provide critical fundraising guidance "
+                        f"for {startup_name}. Her network across Openspace portfolio companies opens partnership "
+                        "and co-investment opportunities."
                     ),
-                    "engagement_recommendation": "Engage for fundraising readiness after 3-month Indonesia pilot data is available",
-                    "estimated_time_to_value": "3-6 months",
+                    "engagement_recommendation": "Engage for fundraising readiness and investor introduction strategy",
+                    "estimated_time_to_value": "4-8 weeks",
                 },
             ],
             "matching_methodology": (
@@ -86,13 +86,11 @@ class MentorIntelligenceAgent(BaseAgent):
                 "(2) market overlap scoring [30%], (3) historical trust score [20%], (4) availability weighting [10%]. "
                 "All scores validated against ecosystem memory for past collaboration quality."
             ),
-            "ecosystem_gap": "No mentor available with deep Thailand healthcare regulatory expertise — recommend recruiting",
+            "ecosystem_gap": f"Limited mentor coverage for deep {industry}-specific regulatory expertise in all target markets",
             "reasoning": (
-                "The mentor cohort for HealthAI's Indonesia expansion is exceptionally well-matched. The top 3 mentors "
-                "provide complementary coverage: Chen for strategic AI/health market entry, Fauzi for regulatory and "
-                "government, Menon for capital. This triangular coverage addresses the three biggest risks in the "
-                "expansion thesis. Recommend sequencing: Fauzi first (regulatory), Chen concurrent (strategy), "
-                "Menon after first hospital pilot (fundraising readiness)."
+                f"Top 3 mentors selected for {startup_name} based on query: '{query}'. "
+                "The cohort provides complementary coverage across strategy, regulatory, and fundraising dimensions. "
+                f"Market overlap with {', '.join(target_markets)} is the primary selection criterion alongside industry alignment."
             ),
         }
 

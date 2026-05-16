@@ -1,0 +1,14 @@
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Install deps — stored in a named volume so they survive bind-mount overlay
+COPY package.json package-lock.json ./
+RUN npm ci
+
+# Source is bind-mounted at runtime; this copy is just for standalone image use
+COPY . .
+
+EXPOSE 3000
+
+CMD ["npm", "run", "dev"]

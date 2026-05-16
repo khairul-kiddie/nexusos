@@ -15,6 +15,10 @@ class ProgrammeIntelligenceAgent(BaseAgent):
         startup = context.get("startup_profile", DEMO_STARTUP.model_dump())
         query = context.get("query", "")
 
+        industry = startup.get("industry", "technology")
+        stage = startup.get("stage", "Seed")
+        startup_name = startup.get("name", "the startup")
+        target_markets = startup.get("target_markets", ["Malaysia"])
         fallback = {
             "recommended_programmes": [
                 {
@@ -23,20 +27,19 @@ class ProgrammeIntelligenceAgent(BaseAgent):
                     "type": "Grant",
                     "provider": "MDEC",
                     "funding_amount": 500000,
-                    "eligibility_score": 0.95,
+                    "eligibility_score": 0.88,
                     "strategic_value": "Critical",
                     "match_reasons": [
-                        "Direct mandate for ASEAN market expansion — Indonesia qualifies",
-                        "AI Healthcare listed as priority sector for 2025 cohort",
-                        "HealthAI's seed stage and MYR revenue meets all criteria",
-                        "MDEC has active partnership with Kemenkes for recipient introductions",
+                        f"Supports ASEAN market expansion for {industry} startups",
+                        f"{stage} stage eligibility confirmed",
+                        "No equity dilution — non-dilutive funding",
+                        "MDEC ecosystem network accelerates market entry",
                     ],
-                    "action_required": "Submit Expression of Interest by Aug 2025. Request MDEC tech advisor introduction.",
+                    "action_required": "Submit Expression of Interest. Highlight target market expansion plan.",
                     "deadline": "2025-09-30",
                     "why_selected": (
-                        "MDEC GAIN is the single highest-impact programme for HealthAI's Indonesia expansion. "
-                        "The RM 500K grant directly funds market entry costs (regulatory, BD, local ops) with no equity dilution. "
-                        "MDEC's existing Indonesia government relationships accelerate Kemenkes engagement by an estimated 6 months."
+                        f"MDEC GAIN is the primary expansion grant for {startup_name}. "
+                        f"The RM 500K directly funds market entry costs into {', '.join(target_markets)} with no equity dilution."
                     ),
                     "cross_border_opportunity": True,
                 },
@@ -46,45 +49,21 @@ class ProgrammeIntelligenceAgent(BaseAgent):
                     "type": "Accelerator",
                     "provider": "MaGIC",
                     "funding_amount": 150000,
-                    "eligibility_score": 0.87,
-                    "strategic_value": "High",
-                    "match_reasons": [
-                        "Healthcare AI vertical is 2025 cohort focus",
-                        "Global mentor network includes 3 Indonesia-specific advisors",
-                        "$150K investment with follow-on facilitation",
-                        "Silicon Valley bootcamp opens US clinical partnership opportunities",
-                    ],
-                    "action_required": "Apply by Aug 15. Highlight Indonesia clinical pilot commitment in application.",
-                    "deadline": "2025-08-15",
-                    "why_selected": (
-                        "MaGIC provides capital AND network — the combination is rare. The Indonesia advisor network within "
-                        "MaGIC's mentor pool directly de-risks market entry. The Silicon Valley bootcamp could open "
-                        "FDA regulatory pathway conversations valuable for long-term US expansion."
-                    ),
-                    "cross_border_opportunity": True,
-                },
-                {
-                    "programme_id": "prog-004",
-                    "name": "Indonesia Digital Health Initiative",
-                    "type": "Government Programme",
-                    "provider": "Kemenkes Indonesia / USAID",
-                    "funding_amount": 200000,
                     "eligibility_score": 0.82,
                     "strategic_value": "High",
                     "match_reasons": [
-                        "Direct Kemenkes relationship — fastest path to hospital pilot approval",
-                        "USAID co-funding adds credibility for hospital procurement",
-                        "Programme includes BPOM fast-track designation for USAID-backed companies",
-                        "Network of 45 participating hospitals across Java, Bali, and Sumatra",
+                        f"{industry} sector aligned with programme focus areas",
+                        "Global mentor network with ASEAN market specialists",
+                        "Investment plus follow-on facilitation",
+                        "International bootcamp opens partnership opportunities",
                     ],
-                    "action_required": "Apply through Kemenkes Digital Health Office. Ahmad Fauzi can facilitate introduction.",
-                    "deadline": "2025-12-01",
+                    "action_required": "Apply by Aug 15. Demonstrate market traction and expansion readiness.",
+                    "deadline": "2025-08-15",
                     "why_selected": (
-                        "This programme solves HealthAI's most critical Indonesia challenge: hospital access. "
-                        "The USAID-backed credibility bypasses 12+ months of typical procurement cycles. "
-                        "BPOM fast-track (available to programme participants) reduces regulatory timeline by ~40%."
+                        f"MaGIC provides capital and a network for {startup_name}. "
+                        "The ASEAN mentor pool and international exposure directly support expansion objectives."
                     ),
-                    "cross_border_opportunity": False,
+                    "cross_border_opportunity": True,
                 },
                 {
                     "programme_id": "prog-003",
@@ -92,36 +71,33 @@ class ProgrammeIntelligenceAgent(BaseAgent):
                     "type": "Grant",
                     "provider": "Cradle Fund",
                     "funding_amount": 300000,
-                    "eligibility_score": 0.78,
+                    "eligibility_score": 0.75,
                     "strategic_value": "Medium",
                     "match_reasons": [
-                        "IP-focused grant aligns with HealthAI's computer vision IP portfolio",
-                        "Co-investment structure unlocks up to RM 300K additional capital",
-                        "Ministry of Finance backing enables government hospital procurement",
+                        "R&D and IP commercialisation support",
+                        "Co-investment structure for additional capital leverage",
+                        "Ministry of Finance backing for government sector access",
                     ],
-                    "action_required": "Prepare IP documentation. Apply after MDEC GAIN result (avoid funding conflict).",
+                    "action_required": "Prepare IP documentation. Apply after primary grant outcome to avoid stacking conflicts.",
                     "deadline": "2025-10-31",
                     "why_selected": (
-                        "Cradle complements MDEC GAIN as a secondary funding source. "
-                        "Best applied for in Q4 after MDEC outcome is known to avoid grant stacking issues."
+                        f"Cradle CIP is a strong secondary funding source for {startup_name}. "
+                        "Best sequenced after the MDEC GAIN result."
                     ),
                     "cross_border_opportunity": False,
                 },
             ],
-            "total_available_funding": 1150000,
+            "total_available_funding": 950000,
             "recommended_funding_sequence": [
                 "1. MaGIC (Aug 15 deadline) — apply immediately",
                 "2. MDEC GAIN (Sep 30) — primary expansion grant",
-                "3. Indonesia Digital Health Initiative (Dec 1) — in-country programme",
-                "4. Cradle CIP (Oct 31) — secondary, apply after MDEC result",
+                "3. Cradle CIP (Oct 31) — secondary, apply after MDEC result",
             ],
             "cross_border_programmes": 2,
             "reasoning": (
-                "HealthAI can access up to MYR 1.15M in non-dilutive funding across 4 programmes. "
-                "The recommended sequence manages application bandwidth and avoids conflicting grant conditions. "
-                "Priority order maximizes Indonesia-specific support: MaGIC builds the network, MDEC GAIN funds the entry, "
-                "Indonesia Digital Health opens hospital doors. Total funding trajectory positions HealthAI for a "
-                "Series A raise from a position of validated Indonesia traction with government-backed credibility."
+                f"{startup_name} can access up to MYR 950K in non-dilutive funding across 3 programmes. "
+                f"The recommended sequence manages application bandwidth and avoids conflicting grant conditions. "
+                f"Priority order maximises support for the query: '{query}'."
             ),
         }
 

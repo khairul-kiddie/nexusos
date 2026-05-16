@@ -1,17 +1,36 @@
-version: "3.9"
+name: nexusos
 
 services:
+  # ── Frontend ─────────────────────────────────────────────────────────────
   frontend:
     build:
       context: ./frontend
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.dev
     ports:
       - "3000:3000"
     environment:
-      - NEXT_PUBLIC_API_URL=http://localhost:8000
+      # Browser-visible backend URL (must be reachable from the user's browser)
+      NEXT_PUBLIC_API_URL: http://localhost:8000
+      # Server-side rewrite target — uses Docker network, never localhost
+      BACKEND_INTERNAL_URL: http://backend:8000
+      # Gemini key for the Next.js AI agent routes (/api/ecosystem/*, etc.)
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      # File-watching for hot reload inside Docker on macOS
+      WATCHPACK_POLLING: "true"
+      CHOKIDAR_USEPOLLING: "true"
+    volumes:
+      # Bind-mount source for hot reload
+      - ./frontend:/app
+      # Named volumes keep container-built node_modules and .next cache
+      # isolated from the host, preventing Linux/macOS binary conflicts
+      - frontend_node_modules:/app/node_modules
+      - frontend_next_cache:/app/.next
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
 
+  # ── Backend ──────────────────────────────────────────────────────────────
   backend:
     build:
       context: ./backend
@@ -19,16 +38,19 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
-      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-2.5-pro-preview-06-05}
-      - DATABASE_URL=${DATABASE_URL:-postgresql://nexusos:nexusos@postgres:5432/nexusos}
-    depends_on:
-      - postgres
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-1.5-flash}
     volumes:
+      # Bind-mount source for --reload hot restart
       - ./backend:/app
+    restart: unless-stopped
+    # healthcheck is defined in the Dockerfile
 
+  # ── Optional: Postgres ───────────────────────────────────────────────────
+  # Start with: docker compose --profile db up
   postgres:
     image: postgres:16-alpine
+    profiles: [db]
     environment:
       POSTGRES_DB: nexusos
       POSTGRES_USER: nexusos
@@ -37,17 +59,27 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nexusos"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
+  # ── Optional: Neo4j ──────────────────────────────────────────────────────
+  # Start with: docker compose --profile graph up
   neo4j:
     image: neo4j:5-community
-    ports:
-      - "7474:7474"
-      - "7687:7687"
+    profiles: [graph]
     environment:
       NEO4J_AUTH: neo4j/nexusos
+    ports:
+      - "7474:7474"  # Browser UI
+      - "7687:7687"  # Bolt protocol
     volumes:
       - neo4j_data:/data
 
 volumes:
+  frontend_node_modules:
+  frontend_next_cache:
   postgres_data:
   neo4j_data:
