@@ -11,7 +11,6 @@ import { MetricCard } from "@/components/ui/MetricCard";
 import { Badge } from "@/components/ui/Badge";
 import { api } from "@/lib/api";
 import type { EcosystemStats, ActivityItem } from "@/types/ecosystem";
-import { DEMO_METRICS, ACTIVITY_FEED } from "@/lib/mock-data";
 
 const HERO_WORDS = ["Startups", "Mentors", "Investors", "Agencies", "Universities"];
 const REFRESH_INTERVAL_MS = 30_000;
@@ -74,11 +73,15 @@ export default function Dashboard() {
         grants_disbursed: stats.grantsDisbursed,
         successful_exits: stats.successfulExits,
       }
-    : DEMO_METRICS;
+    : null;
 
-  const feedItems = activity.length > 0
-    ? activity.map((a, i) => ({ id: i, type: a.type, message: a.message, time: a.time, icon: a.icon }))
-    : ACTIVITY_FEED;
+  const feedItems = activity.map((a: ActivityItem, i: number) => ({
+    id: i,
+    type: a.type,
+    message: a.message,
+    time: a.time,
+    icon: a.icon,
+  }));
 
   return (
     <div className="min-h-screen p-6 space-y-8">
@@ -167,7 +170,7 @@ export default function Dashboard() {
             {[0, 1, 2].map(i => <SkeletonBlock key={i} className="h-28" />)}
           </div>
         </>
-      ) : (
+      ) : metrics ? (
         <>
           <div className="grid grid-cols-3 gap-4">
             <MetricCard
@@ -225,7 +228,7 @@ export default function Dashboard() {
             />
           </div>
         </>
-      )}
+      ) : null}
 
       {/* Quick Navigation + Activity */}
       <div className="grid grid-cols-3 gap-4">
@@ -246,7 +249,7 @@ export default function Dashboard() {
               href: "/graph",
               icon: Share2,
               title: "Ecosystem Graph",
-              description: `Visualize the full innovation network. ${metrics.total_startups} nodes, ${metrics.connections_formed} relationship edges, live and interactive.`,
+              description: `Visualize the full innovation network. ${metrics?.total_startups ?? "—"} nodes, ${metrics?.connections_formed ?? "—"} relationship edges, live and interactive.`,
               color: "from-accent-purple/10 to-accent-cyan/5",
               borderColor: "border-accent-purple/20",
               textColor: "text-accent-purple",

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
-import { ShieldCheck, AlertTriangle, AlertCircle, Info, TrendingDown, BarChart3, RefreshCw, Sparkles } from "lucide-react";
+import { ShieldCheck, AlertTriangle, AlertCircle, Info, TrendingDown, BarChart3, RefreshCw, Sparkles, WifiOff } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 import { severityColor } from "@/lib/utils";
 import { api } from "@/lib/api";
@@ -69,89 +69,18 @@ function HealthGauge({ score }: { score: number }) {
   );
 }
 
-const FALLBACK_HEALTH: EcosystemHealth = {
-  overallScore: 72.4,
-  dimensions: [
-    { name: "Mentor Availability", score: 68, trend: "declining", insight: "2 mentors at capacity, 14 startups unmatched" },
-    { name: "Programme Coverage", score: 79, trend: "improving", insight: "10 active programmes covering most stages" },
-    { name: "Funding Flow", score: 74, trend: "stable", insight: "MYR 5.25M available across programmes" },
-    { name: "Sector Diversity", score: 71, trend: "stable", insight: "AgriTech critically underserved at 3% coverage" },
-    { name: "Geographic Balance", score: 70, trend: "declining", insight: "East Malaysia: 11% startups, 4% mentorship" },
-    { name: "Outcome Quality", score: 82, trend: "improving", insight: "Strong mentor satisfaction and exit track record" },
-  ],
-  alerts: [
-    {
-      alertId: "alert-001",
-      type: "mentor_overload",
-      severity: "high",
-      title: "Dr. Sarah Chen — Mentor Overload Risk",
-      description: "Currently mentoring 7 startups. Optimal load: 4-5. Quality degradation risk: 18% based on historical data.",
-      affectedEntities: ["Dr. Sarah Chen", "3 active mentees"],
-      recommendation: "Redistribute 2-3 mentees to Kevin Lim or recruit from IHH Digital network.",
-      impactScore: 0.74,
-    },
-    {
-      alertId: "alert-002",
-      type: "sector_gap",
-      severity: "medium",
-      title: "AgriTech Sector Severely Underserved",
-      description: "AgriTech is 10% of ecosystem but only 3% of mentor capacity.",
-      affectedEntities: ["AgriTech Sector", "2 unmatched startups"],
-      recommendation: "Launch targeted AgriTech mentor recruitment. Flag to MDEC for programme design.",
-      impactScore: 0.61,
-    },
-    {
-      alertId: "alert-003",
-      type: "geographic_imbalance",
-      severity: "medium",
-      title: "East Malaysia Ecosystem Gap",
-      description: "Sabah & Sarawak: 20% of startups but only 4% mentorship hours and 6% grant funding.",
-      affectedEntities: ["Kota Kinabalu startups", "Kuching startups"],
-      recommendation: "Create East Malaysia virtual mentorship cohort. Advocate for MDEC regional allocation.",
-      impactScore: 0.58,
-    },
-    {
-      alertId: "alert-004",
-      type: "funding_bottleneck",
-      severity: "low",
-      title: "Series B Funding Gap",
-      description: "Only 1 programme supports Series B. Startups face avg 14-month gap before international VC.",
-      affectedEntities: ["Series A graduates"],
-      recommendation: "Advocate for Series B bridge programme with Khazanah or PNB partnership.",
-      impactScore: 0.52,
-    },
-  ],
-  sectorCoverage: {
-    "AI/ML": 0.88,
-    "FinTech": 0.85,
-    "HealthTech": 0.79,
-    "EdTech": 0.72,
-    "CleanTech": 0.65,
-    "LogiTech": 0.58,
-    "PropTech": 0.61,
-    "AgriTech": 0.31,
-  },
-  monthlyTrends: {
-    "New Startups": 23,
-    "Mentor Sessions": 156,
-    "Grants Disbursed": 8,
-    "Market Entries": 4,
-    "New Connections": 89,
-  },
-  narrative: "The Malaysian startup ecosystem shows steady progress with 72.4% overall health. Mentor capacity is the primary constraint, with 2 top mentors at full load. Geographic imbalance in East Malaysia remains an urgent concern requiring targeted intervention.",
-  aiGeneratedAt: new Date().toISOString(),
-};
-
 export default function GovernancePage() {
-  const [health, setHealth] = useState<EcosystemHealth>(FALLBACK_HEALTH);
+  const [health, setHealth] = useState<EcosystemHealth | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
   const fetchHealth = useCallback(async () => {
+    setError(false);
     try {
       const data = await api.getEcosystemHealth();
       setHealth(data);
     } catch {
-      // Keep fallback data
+      setError(true);
     } finally {
       setLoading(false);
     }
@@ -163,12 +92,37 @@ export default function GovernancePage() {
     return () => clearInterval(interval);
   }, [fetchHealth]);
 
-  const highAlerts = health.alerts.filter((a: EcosystemGovernanceAlert) => a.severity === "high").length;
-  const mediumAlerts = health.alerts.filter((a: EcosystemGovernanceAlert) => a.severity === "medium").length;
+  const highAlerts = health?.alerts.filter((a: EcosystemGovernanceAlert) => a.severity === "high").length ?? 0;
+  const mediumAlerts = health?.alerts.filter((a: EcosystemGovernanceAlert) => a.severity === "medium").length ?? 0;
+  const healthBreakdown = health
+    ? Object.fromEntries(health.dimensions.map(d => [d.name, d.score]))
+    : {};
 
-  const healthBreakdown = Object.fromEntries(
-    health.dimensions.map(d => [d.name, d.score])
-  );
+  // Error state
+  if (!loading && error) {
+    return (
+      <div className="min-h-screen p-6 flex items-center justify-center">
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="glass rounded-2xl border border-red-500/20 p-8 max-w-md text-center"
+        >
+          <WifiOff className="w-10 h-10 text-red-400 mx-auto mb-4" />
+          <h2 className="text-lg font-semibold text-white mb-2">Could Not Load Governance Data</h2>
+          <p className="text-sm text-slate-500 mb-5 leading-relaxed">
+            The Governance Intelligence Agent could not be reached. Check that the backend is running and GEMINI_API_KEY is configured.
+          </p>
+          <button
+            onClick={fetchHealth}
+            className="flex items-center gap-2 px-4 py-2 bg-accent-amber/10 border border-accent-amber/30 text-accent-amber rounded-xl hover:bg-accent-amber/20 transition-colors mx-auto text-sm font-medium"
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+            Retry
+          </button>
+        </motion.div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen p-6 space-y-6">
@@ -179,7 +133,7 @@ export default function GovernancePage() {
           <h1 className="text-xl font-bold text-white">Governance Intelligence</h1>
           {highAlerts > 0 && <Badge variant="red">{highAlerts} critical</Badge>}
           {mediumAlerts > 0 && <Badge variant="amber">{mediumAlerts} warnings</Badge>}
-          {!loading && <AiBadge generatedAt={health.aiGeneratedAt} />}
+          {health && <AiBadge generatedAt={health.aiGeneratedAt} />}
           <button
             onClick={fetchHealth}
             className="ml-auto p-1.5 text-slate-600 hover:text-slate-400 transition-colors rounded"
@@ -190,7 +144,7 @@ export default function GovernancePage() {
         <p className="text-sm text-slate-500">
           Real-time ecosystem health monitoring. Detect imbalances, mentor overload, and underserved sectors.
         </p>
-        {!loading && health.narrative && (
+        {health?.narrative && (
           <p className="text-xs text-slate-600 mt-2 italic max-w-3xl">{health.narrative}</p>
         )}
       </motion.div>
@@ -200,7 +154,7 @@ export default function GovernancePage() {
         <div className="grid grid-cols-4 gap-4">
           {[0, 1, 2, 3].map(i => <SkeletonBlock key={i} className="h-48" />)}
         </div>
-      ) : (
+      ) : health && (
         <div className="grid grid-cols-4 gap-4">
           {/* Main Score */}
           <motion.div
@@ -259,6 +213,9 @@ export default function GovernancePage() {
                         transition={{ duration: 1, delay: 0.3 + i * 0.08, ease: "easeOut" }}
                       />
                     </div>
+                    {dim?.insight && (
+                      <p className="text-[10px] text-slate-600 mt-0.5">{dim.insight}</p>
+                    )}
                   </div>
                 );
               })}
@@ -297,7 +254,7 @@ export default function GovernancePage() {
           <h2 className="text-sm font-semibold text-slate-200">Governance Alerts</h2>
           {loading ? (
             <SkeletonBlock className="w-24 h-5" />
-          ) : (
+          ) : health && (
             <Badge variant="red" dot>{health.alerts.length} Active</Badge>
           )}
         </div>
@@ -305,7 +262,7 @@ export default function GovernancePage() {
           <div className="grid grid-cols-2 gap-4">
             {[0, 1, 2, 3].map(i => <SkeletonBlock key={i} className="h-48" />)}
           </div>
-        ) : (
+        ) : health && (
           <div className="grid grid-cols-2 gap-4">
             {health.alerts.map((alert: EcosystemGovernanceAlert, i: number) => {
               const color = severityColor(alert.severity);
@@ -367,7 +324,7 @@ export default function GovernancePage() {
       </div>
 
       {/* Sector Coverage */}
-      {!loading && (
+      {!loading && health && (
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}

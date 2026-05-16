@@ -3,16 +3,20 @@
 import dynamic from "next/dynamic";
 import { motion } from "framer-motion";
 import { useState } from "react";
-import { Share2, Filter, Info } from "lucide-react";
+import { Share2, Info } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 import { NODE_COLORS } from "@/lib/utils";
-import { DEMO_RESULT } from "@/lib/mock-data";
+import { buildEcosystemGraph, deriveGraphInsights } from "@/lib/graph-builder";
 import type { NodeType } from "@/lib/types";
 
 const EcosystemGraph = dynamic(
   () => import("@/components/graph/EcosystemGraph"),
   { ssr: false, loading: () => <GraphSkeleton /> }
 );
+
+// Computed once at module load — pure/deterministic from MOCK_* data
+const GRAPH_DATA = buildEcosystemGraph();
+const GRAPH_INSIGHTS = deriveGraphInsights(GRAPH_DATA);
 
 function GraphSkeleton() {
   return (
@@ -39,7 +43,6 @@ const NODE_TYPES: { type: NodeType; label: string }[] = [
 ];
 
 export default function GraphPage() {
-  const graphData = DEMO_RESULT.ecosystem_graph!;
   const [activeFilters, setActiveFilters] = useState<Set<NodeType>>(new Set());
 
   const toggleFilter = (type: NodeType) => {
@@ -51,11 +54,11 @@ export default function GraphPage() {
     });
   };
 
-  const filteredGraph = activeFilters.size === 0 ? graphData : {
-    nodes: graphData.nodes.filter((n) => !activeFilters.has(n.type as NodeType)),
-    edges: graphData.edges.filter((e) => {
-      const sourceNode = graphData.nodes.find((n) => n.id === e.source);
-      const targetNode = graphData.nodes.find((n) => n.id === e.target);
+  const filteredGraph = activeFilters.size === 0 ? GRAPH_DATA : {
+    nodes: GRAPH_DATA.nodes.filter((n) => !activeFilters.has(n.type as NodeType)),
+    edges: GRAPH_DATA.edges.filter((e) => {
+      const sourceNode = GRAPH_DATA.nodes.find((n) => n.id === e.source);
+      const targetNode = GRAPH_DATA.nodes.find((n) => n.id === e.target);
       return sourceNode && targetNode &&
         !activeFilters.has(sourceNode.type as NodeType) &&
         !activeFilters.has(targetNode.type as NodeType);
@@ -107,7 +110,7 @@ export default function GraphPage() {
           </div>
 
           <div className="flex items-center gap-2">
-            <Badge variant="purple">HealthAI Demo</Badge>
+            <Badge variant="purple">Live Ecosystem</Badge>
             <Badge variant="cyan" dot>Live Graph</Badge>
           </div>
         </div>
@@ -130,9 +133,9 @@ export default function GraphPage() {
           </div>
           <div className="space-y-2">
             {[
-              { label: "Strongest Edge", value: "HealthAI → Dr. Chen", score: "96%", color: "text-accent-purple" },
-              { label: "Best Grant Match", value: "MDEC GAIN Grant", score: "95%", color: "text-accent-amber" },
-              { label: "Key Bridge Node", value: "Ahmad Fauzi", score: "Kemenkes link", color: "text-accent-green" },
+              { label: "Strongest Edge",  value: GRAPH_INSIGHTS.strongestEdge.label,  score: GRAPH_INSIGHTS.strongestEdge.score,  color: "text-accent-purple" },
+              { label: "Best Grant Match", value: GRAPH_INSIGHTS.bestGrant.label,       score: GRAPH_INSIGHTS.bestGrant.score,       color: "text-accent-amber" },
+              { label: "Key Bridge Node", value: GRAPH_INSIGHTS.keyBridgeNode.label,   score: GRAPH_INSIGHTS.keyBridgeNode.detail,  color: "text-accent-green" },
             ].map((item) => (
               <div key={item.label} className="flex items-center justify-between">
                 <div>

@@ -1,17 +1,21 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Zap, Send, RotateCcw, Clock, CheckCircle2, Cpu } from "lucide-react";
+import { Zap, RotateCcw, Clock, CheckCircle2, Cpu, AlertCircle } from "lucide-react";
 import { AgentCard } from "@/components/orchestration/AgentCard";
 import { ActivityFeed } from "@/components/orchestration/ActivityFeed";
 import { ReasoningPanel } from "@/components/orchestration/ReasoningPanel";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { api } from "@/lib/api";
-import { DEMO_RESULT, DEMO_QUERY, ACTIVITY_FEED } from "@/lib/mock-data";
+import { DEMO_QUERY } from "@/lib/mock-data";
 import { formatMs } from "@/lib/utils";
-import type { OrchestrationResult, AgentStatus } from "@/lib/types";
+import type { OrchestrationResult, AgentOutput, AgentStatus } from "@/lib/types";
+
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
 
 const AGENTS = [
   "Relationship Memory Agent",
@@ -19,111 +23,167 @@ const AGENTS = [
   "Governance Agent",
   "Mentor Intelligence Agent",
   "Programme Intelligence Agent",
+] as const;
+
+type AgentName = (typeof AGENTS)[number] | "Master Orchestrator";
+
+const PHASES: { label: string; delay: number; agent?: AgentName; feedType: string; feedMessage: string; feedIcon: string }[] = [
+  { label: "Initializing",                  delay: 300,  feedType: "insight",    feedMessage: "Initialising NexusOS multi-agent pipeline...",                       feedIcon: "⚡" },
+  { label: "Retrieving Ecosystem Memory",   delay: 500,  agent: "Relationship Memory Agent",   feedType: "memory",    feedMessage: "Querying 24 months of ecosystem relationship memory...",              feedIcon: "💾" },
+  { label: "Analyzing Startup Profile",     delay: 800,  agent: "Startup Intelligence Agent",  feedType: "insight",   feedMessage: "Analysing startup profile and target market readiness...",            feedIcon: "🧠" },
+  { label: "Assessing Governance Health",   delay: 600,  agent: "Governance Agent",            feedType: "alert",     feedMessage: "Running governance health and risk assessment...",                    feedIcon: "🛡️" },
+  { label: "Matching Mentors",              delay: 700,  agent: "Mentor Intelligence Agent",   feedType: "match",     feedMessage: "Computing mentor compatibility with trust-weighted scoring...",       feedIcon: "🔗" },
+  { label: "Discovering Programmes",        delay: 600,  agent: "Programme Intelligence Agent",feedType: "grant",     feedMessage: "Scanning programme eligibility and funding matrix...",                feedIcon: "💰" },
+  { label: "Synthesizing Master Report",    delay: 500,  feedType: "graph",     feedMessage: "Synthesising master intelligence report across all agent outputs...",  feedIcon: "✨" },
 ];
 
-type AgentState = { status: AgentStatus; output?: OrchestrationResult["agent_outputs"][0] };
+type AgentState = { status: AgentStatus; output?: AgentOutput };
 
-const ORCHESTRATION_PHASES = [
-  { label: "Initializing", duration: 400 },
-  { label: "Retrieving Ecosystem Memory", duration: 600 },
-  { label: "Analyzing Startup Profile", duration: 900 },
-  { label: "Assessing Governance Health", duration: 700 },
-  { label: "Matching Mentors", duration: 800 },
-  { label: "Discovering Programmes", duration: 700 },
-  { label: "Synthesizing Master Report", duration: 600 },
-  { label: "Complete", duration: 0 },
-];
+// ---------------------------------------------------------------------------
+// Helpers — extract real values from agent outputs
+// ---------------------------------------------------------------------------
+
+function buildSummaryCards(result: OrchestrationResult) {
+  const byName = Object.fromEntries(result.agent_outputs.map(o => [o.agent_name, o.output]));
+
+  const sa = byName["Startup Intelligence Agent"] ?? {};
+  const ma = byName["Mentor Intelligence Agent"] ?? {};
+  const pa = byName["Programme Intelligence Agent"] ?? {};
+  const ga = byName["Governance Agent"] ?? {};
+
+  const mentors = Array.isArray(ma.ranked_mentors) ? (ma.ranked_mentors as Record<string, unknown>[]) : [];
+  const avgCompat = mentors.length > 0
+    ? (mentors.reduce((s, m) => s + (typeof m.compatibility_score === "number" ? m.compatibility_score : 0), 0) / mentors.length * 100).toFixed(0)
+    : null;
+
+  const fundingRaw = typeof pa.total_available_funding === "number" ? pa.total_available_funding : null;
+  const programmes = Array.isArray(pa.recommended_programmes) ? pa.recommended_programmes as unknown[] : [];
+  const alerts = Array.isArray(ga.governance_alerts) ? ga.governance_alerts as unknown[] : [];
+
+  const readinessScore = typeof sa.readiness_score === "number" ? sa.readiness_score : null;
+  const industrySub = [sa.industry_classification, sa.maturity_level]
+    .filter(v => typeof v === "string")
+    .join(" · ") || "Analysis complete";
+
+  return [
+    {
+      label: "Startup Readiness",
+      value: readinessScore != null ? `${readinessScore.toFixed(1)} / 100` : "—",
+      color: "text-accent-cyan",
+      sub: industrySub,
+    },
+    {
+      label: "Mentor Matches",
+      value: mentors.length > 0 ? `${mentors.length} matched` : "—",
+      color: "text-accent-purple",
+      sub: avgCompat ? `Avg ${avgCompat}% compatibility` : "Matching complete",
+    },
+    {
+      label: "Funding Available",
+      value: fundingRaw != null
+        ? `MYR ${(fundingRaw / 1_000_000).toFixed(2)}M`
+        : programmes.length > 0 ? `${programmes.length} programmes` : "—",
+      color: "text-accent-amber",
+      sub: programmes.length > 0 ? `${programmes.length} programmes identified` : "Programmes scanned",
+    },
+    {
+      label: "Ecosystem Health",
+      value: `${result.ecosystem_health_score.toFixed(1)}%`,
+      color: "text-accent-green",
+      sub: alerts.length > 0 ? `${alerts.length} governance alerts` : "Health monitored",
+    },
+  ];
+}
+
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
 
 export default function OrchestratePage() {
   const [query, setQuery] = useState(DEMO_QUERY);
   const [isRunning, setIsRunning] = useState(false);
   const [result, setResult] = useState<OrchestrationResult | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [agentStates, setAgentStates] = useState<Record<string, AgentState>>(
-    Object.fromEntries(AGENTS.map((a) => [a, { status: "pending" as AgentStatus }]))
+    Object.fromEntries(AGENTS.map(a => [a, { status: "pending" as AgentStatus }])),
   );
   const [phase, setPhase] = useState(0);
-  const [feedItems, setFeedItems] = useState(ACTIVITY_FEED.slice(0, 2));
+  const [feedItems, setFeedItems] = useState<{ id: number; type: string; message: string; time: string; icon: string }[]>([]);
   const [elapsedMs, setElapsedMs] = useState(0);
+  const feedIdRef = useRef(0);
+
+  const addFeedItem = useCallback((type: string, message: string, icon: string) => {
+    setFeedItems(prev => [...prev, { id: ++feedIdRef.current, type, message, time: "just now", icon }]);
+  }, []);
 
   const resetState = () => {
     setResult(null);
+    setError(null);
     setPhase(0);
-    setFeedItems(ACTIVITY_FEED.slice(0, 2));
+    setFeedItems([]);
     setElapsedMs(0);
-    setAgentStates(Object.fromEntries(AGENTS.map((a) => [a, { status: "pending" as AgentStatus }])));
+    feedIdRef.current = 0;
+    setAgentStates(Object.fromEntries(AGENTS.map(a => [a, { status: "pending" as AgentStatus }])));
   };
 
   const runOrchestration = async () => {
+    if (!query.trim()) return;
     resetState();
     setIsRunning(true);
     const startTime = Date.now();
-
     const timer = setInterval(() => setElapsedMs(Date.now() - startTime), 100);
 
+    // Start the real API call immediately — runs in parallel with the animation
+    const apiPromise = api.orchestrate({ query });
+
     try {
-      // Animate phases
-      for (let i = 0; i < ORCHESTRATION_PHASES.length - 1; i++) {
+      // Cosmetic animation — sets running states only, no hardcoded output data
+      for (let i = 0; i < PHASES.length; i++) {
+        const p = PHASES[i];
         setPhase(i);
-
-        // Update agent states based on phase
-        if (i === 1) {
-          setAgentStates((s) => ({ ...s, "Relationship Memory Agent": { status: "running" } }));
-        } else if (i === 2) {
-          setAgentStates((s) => ({
-            ...s,
-            "Relationship Memory Agent": { status: "completed", output: DEMO_RESULT.agent_outputs[0] },
-            "Startup Intelligence Agent": { status: "running" },
-          }));
-          setFeedItems((f) => [...f, ACTIVITY_FEED[2]]);
-        } else if (i === 3) {
-          setAgentStates((s) => ({
-            ...s,
-            "Startup Intelligence Agent": { status: "completed", output: DEMO_RESULT.agent_outputs[1] },
-            "Governance Agent": { status: "running" },
-          }));
-          setFeedItems((f) => [...f, ACTIVITY_FEED[3]]);
-        } else if (i === 4) {
-          setAgentStates((s) => ({
-            ...s,
-            "Governance Agent": { status: "completed", output: DEMO_RESULT.agent_outputs[2] },
-            "Mentor Intelligence Agent": { status: "running" },
-          }));
-          setFeedItems((f) => [...f, ACTIVITY_FEED[4]]);
-        } else if (i === 5) {
-          setAgentStates((s) => ({
-            ...s,
-            "Mentor Intelligence Agent": { status: "completed", output: DEMO_RESULT.agent_outputs[3] },
-            "Programme Intelligence Agent": { status: "running" },
-          }));
-          setFeedItems((f) => [...f, ACTIVITY_FEED[5]]);
-        } else if (i === 6) {
-          setAgentStates((s) => ({
-            ...s,
-            "Programme Intelligence Agent": { status: "completed", output: DEMO_RESULT.agent_outputs[4] },
-          }));
-          setFeedItems((f) => [...f, ACTIVITY_FEED[6], ACTIVITY_FEED[7]]);
+        addFeedItem(p.feedType, p.feedMessage, p.feedIcon);
+        if (p.agent) {
+          setAgentStates(s => ({ ...s, [p.agent!]: { status: "running" } }));
         }
-
-        await new Promise((r) => setTimeout(r, ORCHESTRATION_PHASES[i].duration));
+        await new Promise(r => setTimeout(r, p.delay));
       }
 
-      // Try real API first, fall back to demo
-      let apiResult: OrchestrationResult;
-      try {
-        apiResult = await api.orchestrate({ query });
-      } catch {
-        apiResult = { ...DEMO_RESULT, query };
-      }
+      // Wait for the real API response (may have already resolved during animation)
+      const apiResult = await apiPromise;
+
+      // Map real agent outputs by name
+      const outputMap = Object.fromEntries(apiResult.agent_outputs.map(o => [o.agent_name, o]));
+
+      setAgentStates(
+        Object.fromEntries(
+          AGENTS.map(name => [
+            name,
+            outputMap[name]
+              ? { status: "completed" as AgentStatus, output: outputMap[name] }
+              : { status: "completed" as AgentStatus },
+          ]),
+        ),
+      );
+
+      const execMs = apiResult.total_execution_time_ms;
+      addFeedItem("graph", `Orchestration complete — ${apiResult.agent_outputs.length} agents · ${formatMs(execMs)}`, "✅");
 
       setResult(apiResult);
-      setPhase(ORCHESTRATION_PHASES.length - 1);
+      setPhase(PHASES.length);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Orchestration failed.";
+      setError(`${msg} Check that the backend is running and GEMINI_API_KEY is set.`);
+      setAgentStates(prev =>
+        Object.fromEntries(Object.keys(prev).map(name => [name, { status: "failed" as AgentStatus }])),
+      );
+      addFeedItem("alert", "Orchestration failed — see error message above.", "⚠️");
     } finally {
       clearInterval(timer);
       setIsRunning(false);
     }
   };
 
-  const completedCount = Object.values(agentStates).filter((s) => s.status === "completed").length;
+  const completedCount = Object.values(agentStates).filter(s => s.status === "completed").length;
 
   return (
     <div className="min-h-screen p-6 space-y-6">
@@ -161,7 +221,7 @@ export default function OrchestratePage() {
             </label>
             <textarea
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              onChange={e => setQuery(e.target.value)}
               rows={2}
               className="w-full bg-transparent text-slate-200 text-sm resize-none outline-none placeholder-slate-600 leading-relaxed"
               placeholder="Describe the ecosystem intelligence you need..."
@@ -174,10 +234,11 @@ export default function OrchestratePage() {
               onClick={runOrchestration}
               loading={isRunning}
               icon={<Zap className="w-4 h-4" />}
+              disabled={!query.trim()}
             >
               {isRunning ? "Orchestrating..." : "Run"}
             </Button>
-            {result && (
+            {(result || error) && (
               <Button
                 variant="ghost"
                 size="sm"
@@ -203,7 +264,9 @@ export default function OrchestratePage() {
                 animate={{ scale: [1, 1.4, 1], opacity: [1, 0.5, 1] }}
                 transition={{ duration: 0.8, repeat: Infinity }}
               />
-              <span className="text-xs text-accent-cyan font-medium">{ORCHESTRATION_PHASES[phase]?.label}</span>
+              <span className="text-xs text-accent-cyan font-medium">
+                {PHASES[phase]?.label ?? "Processing with AI..."}
+              </span>
             </div>
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-1.5">
@@ -227,6 +290,21 @@ export default function OrchestratePage() {
         )}
       </motion.div>
 
+      {/* Error state */}
+      <AnimatePresence>
+        {error && (
+          <motion.div
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            className="flex items-start gap-3 px-4 py-3 glass rounded-xl border border-red-500/30 bg-red-500/5"
+          >
+            <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+            <p className="text-sm text-red-400 leading-relaxed">{error}</p>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Agent Grid + Activity Feed */}
       <div className="grid grid-cols-3 gap-4">
         <div className="col-span-2 grid grid-cols-2 gap-3">
@@ -242,7 +320,7 @@ export default function OrchestratePage() {
           {/* Master Orchestrator Card */}
           <AgentCard
             agentName="Master Orchestrator"
-            status={result ? "completed" : isRunning && phase >= 6 ? "running" : "pending"}
+            status={result ? "completed" : isRunning && phase >= PHASES.length - 1 ? "running" : "pending"}
             index={5}
           />
         </div>
@@ -258,24 +336,19 @@ export default function OrchestratePage() {
             animate={{ opacity: 1, y: 0 }}
             className="space-y-4"
           >
-            {/* Summary Cards */}
+            {/* Summary Cards — all values derived from real agent outputs */}
             <div className="grid grid-cols-4 gap-3">
-              {[
-                { label: "Startup Readiness", value: "78.5 / 100", color: "text-accent-cyan", sub: "AI Healthcare · Seed Stage" },
-                { label: "Mentor Matches", value: "3 matched", color: "text-accent-purple", sub: "Avg 91.7% compatibility" },
-                { label: "Funding Available", value: "MYR 1.15M", color: "text-accent-amber", sub: "4 programmes · non-dilutive" },
-                { label: "Ecosystem Health", value: `${result.ecosystem_health_score}%`, color: "text-accent-green", sub: "4 governance alerts" },
-              ].map((item, i) => (
+              {buildSummaryCards(result).map((card, i) => (
                 <motion.div
-                  key={item.label}
+                  key={card.label}
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: i * 0.1 }}
                   className="glass rounded-xl p-4 border border-white/[0.06]"
                 >
-                  <div className="text-xs text-slate-500 mb-1">{item.label}</div>
-                  <div className={`text-lg font-bold font-mono ${item.color}`}>{item.value}</div>
-                  <div className="text-xs text-slate-600 mt-0.5">{item.sub}</div>
+                  <div className="text-xs text-slate-500 mb-1">{card.label}</div>
+                  <div className={`text-lg font-bold font-mono ${card.color}`}>{card.value}</div>
+                  <div className="text-xs text-slate-600 mt-0.5">{card.sub}</div>
                 </motion.div>
               ))}
             </div>
@@ -284,7 +357,7 @@ export default function OrchestratePage() {
             <ReasoningPanel
               reasoning={result.master_reasoning}
               executionTime={result.total_execution_time_ms}
-              confidenceScore={87.3}
+              confidenceScore={result.ecosystem_health_score}
             />
           </motion.div>
         )}

@@ -1,118 +1,191 @@
+"""
+GovernanceAgent — Ecosystem intelligence for NexusOS operators.
+
+Architecture:
+  1. governance_analytics.py computes deterministic metrics from ecosystem data
+  2. This agent feeds those metrics into the LLM, which produces narrative intelligence
+  3. Pydantic validates the merged output before it reaches the caller
+  4. On any failure the agent returns pre-written fallback data enriched with live metrics
+"""
+
+from __future__ import annotations
+
+import json
+import logging
+import re
+import time
 from typing import Any, Dict
+
+from pydantic import ValidationError
+
 from app.agents.base import BaseAgent
+from app.data.governance_fallback import GOVERNANCE_FALLBACK
+from app.models.governance_schemas import GovernanceOutput
+from app.services.governance_analytics import run_governance_analytics
+
+logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Prompt constants  (kept here so the agent is self-contained and auditable)
+# ---------------------------------------------------------------------------
+
+_SYSTEM_INSTRUCTION = """You are the Governance Intelligence Agent in NexusOS — an AI-powered startup ecosystem operating system for Malaysia.
+
+Your role:
+- Interpret pre-computed ecosystem metrics and detected issues
+- Generate structured governance alerts with precise, data-grounded descriptions
+- Produce actionable recommendations tailored to Malaysian ecosystem operators
+- Write a coherent governance narrative synthesising all signals
+
+Important constraints:
+- Only reference data present in the provided metrics — do not invent statistics
+- All agency, programme, and market references must reflect Malaysian / SEA context
+  (MDEC, MaGIC, Cradle, MTDC, PUNB, Khazanah, MDA, NPRA, MOSTI, etc.)
+- Respond ONLY with valid JSON matching the schema below — no markdown, no prose outside JSON"""
+
+_OUTPUT_SCHEMA = """{
+  "governance_alerts": [
+    {
+      "alert_id": "alert-001",
+      "type": "<mentor_overload|sector_gap|geographic_imbalance|funding_bottleneck>",
+      "severity": "<high|medium|low>",
+      "title": "<concise alert title, max 80 chars>",
+      "description": "<2-3 sentences grounded strictly in the provided metrics>",
+      "affected_entities": ["<entity name>"],
+      "recommendation": "<specific, actionable recommendation for ecosystem operators>",
+      "impact_score": <0.0 to 1.0>
+    }
+  ],
+  "ecosystem_bottlenecks": [
+    "<bottleneck statement — specific, narrative, Malaysian-ecosystem context>"
+  ],
+  "recommendations_for_operators": [
+    "<operator recommendation — specific and actionable>"
+  ],
+  "reasoning": "<one paragraph synthesising ecosystem health narrative from the provided metrics>"
+}"""
 
 
-SYSTEM_PROMPT = """You are the Governance Agent in NexusOS.
-Your role is to monitor ecosystem health, detect imbalances, identify underserved sectors,
-surface bottlenecks, and provide governance intelligence to ecosystem operators."""
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
 
+def _sanitize_query(query: str) -> str:
+    """Strip XML/HTML tags and truncate to prevent prompt delimiter injection."""
+    sanitized = re.sub(r"<[^>]{0,100}>", "", query)
+    return sanitized[:500].strip()
+
+
+def _build_prompt(sanitized_query: str, metrics: dict) -> str:
+    return f"""Interpret the following pre-computed Malaysian startup ecosystem metrics and produce governance intelligence.
+
+## Computed Ecosystem Metrics
+```json
+{json.dumps(metrics, indent=2)}
+```
+
+## User Context
+<user_context>
+{sanitized_query}
+</user_context>
+
+## Instructions
+For each item in `detected_issues`:
+- Create one `governance_alerts` entry with a title, 2-3 sentence description, and specific recommendation
+- Set `impact_score` equal to the issue's `impact_score` from the metrics above
+
+Then generate:
+- `ecosystem_bottlenecks`: 3 narrative bottleneck statements grounded in the metrics
+- `recommendations_for_operators`: 5 specific, actionable recommendations
+- `reasoning`: one paragraph synthesising the overall ecosystem health narrative
+
+## Required Output Schema
+{_OUTPUT_SCHEMA}"""
+
+
+def _inject_alert_ids(alerts: list) -> list:
+    """Ensure every alert has an alert_id; generate sequential IDs for any missing."""
+    for i, alert in enumerate(alerts):
+        if not alert.get("alert_id"):
+            alert["alert_id"] = f"alert-{i + 1:03d}"
+    return alerts
+
+
+def _merge_with_metrics(llm_output: dict, metrics: dict) -> dict:
+    """Replace deterministic fields with analytics values; keep LLM narrative fields."""
+    alerts = _inject_alert_ids(llm_output.get("governance_alerts", []))
+    return {
+        "ecosystem_health_score": metrics["health_score"],
+        "health_breakdown":       metrics["health_breakdown"],
+        "governance_alerts":      alerts,
+        "ecosystem_bottlenecks":  llm_output.get("ecosystem_bottlenecks", []),
+        "sector_coverage":        metrics["sector_coverage"],
+        "monthly_trends":         metrics["monthly_trends"],
+        "recommendations_for_operators": llm_output.get("recommendations_for_operators", []),
+        "reasoning":              llm_output.get("reasoning", ""),
+    }
+
+
+def _validate(raw: dict) -> GovernanceOutput | None:
+    try:
+        return GovernanceOutput.model_validate(raw)
+    except ValidationError as exc:
+        logger.warning("Governance output failed schema validation: %s", exc)
+        return None
+
+
+def _apply_live_metrics(fallback: dict, metrics: dict) -> dict:
+    """Inject live analytics values into the fallback so numeric data is always current."""
+    return {
+        **fallback,
+        "ecosystem_health_score": metrics["health_score"],
+        "health_breakdown":       metrics["health_breakdown"],
+        "sector_coverage":        metrics["sector_coverage"],
+        "monthly_trends":         metrics["monthly_trends"],
+    }
+
+
+# ---------------------------------------------------------------------------
+# Agent
+# ---------------------------------------------------------------------------
 
 class GovernanceAgent(BaseAgent):
     name = "Governance Agent"
 
     async def run(self, context: Dict[str, Any]) -> Dict[str, Any]:
         query = context.get("query", "")
+        sanitized_query = _sanitize_query(query)
 
-        fallback = {
-            "ecosystem_health_score": 72.4,
-            "health_breakdown": {
-                "mentor_availability": 68.0,
-                "programme_coverage": 79.0,
-                "funding_flow": 74.0,
-                "sector_diversity": 71.0,
-                "geographic_balance": 70.0,
-                "outcome_quality": 82.0,
-            },
-            "governance_alerts": [
-                {
-                    "alert_id": "alert-001",
-                    "type": "mentor_overload",
-                    "severity": "high",
-                    "title": "Dr. Sarah Chen — Mentor Overload Risk",
-                    "description": "Dr. Chen is currently mentoring 7 startups. Her optimal load is 4-5. Quality degradation risk of 18% based on historical data.",
-                    "affected_entities": ["Dr. Sarah Chen", "3 active mentees"],
-                    "recommendation": "Redistribute 2-3 mentees to Kevin Lim or recruit new mentor from IHH Digital network",
-                    "impact_score": 0.74,
-                },
-                {
-                    "alert_id": "alert-002",
-                    "type": "sector_gap",
-                    "severity": "medium",
-                    "title": "AgriTech Sector Severely Underserved",
-                    "description": "AgriTech startups represent 12% of registered ecosystem companies but only 3% of mentor capacity and 5% of programme funding.",
-                    "affected_entities": ["AgriTech Sector", "14 unmatched startups"],
-                    "recommendation": "Launch targeted AgriTech mentor recruitment. Flag to MDEC for programme design consideration.",
-                    "impact_score": 0.61,
-                },
-                {
-                    "alert_id": "alert-003",
-                    "type": "geographic_imbalance",
-                    "severity": "medium",
-                    "title": "East Malaysia Ecosystem Gap",
-                    "description": "Sabah and Sarawak account for 11% of registered startups but receive only 4% of mentorship hours and 6% of grant funding.",
-                    "affected_entities": ["Sabah startups (18)", "Sarawak startups (14)"],
-                    "recommendation": "Create East Malaysia virtual mentorship cohort. Advocate for MDEC regional grant allocation.",
-                    "impact_score": 0.58,
-                },
-                {
-                    "alert_id": "alert-004",
-                    "type": "funding_bottleneck",
-                    "severity": "low",
-                    "title": "Series B Funding Gap — No Local Bridge Capital",
-                    "description": "0 local programmes support Series B rounds. Startups graduating from Series A face a 14-month average gap before international VC engagement.",
-                    "affected_entities": ["7 Series A graduates", "Growth-stage startups"],
-                    "recommendation": "Advocate for new Series B bridge programme with Khazanah or PNB partnership.",
-                    "impact_score": 0.52,
-                },
-            ],
-            "ecosystem_bottlenecks": [
-                "BPOM approval timeline (avg 15 months) is single biggest expansion blocker for health-tech",
-                "Mentor overconcentration: top 5 mentors handle 43% of all mentorship hours",
-                "Programme application complexity deters Seed-stage founders with limited admin capacity",
-            ],
-            "sector_coverage": {
-                "AI/ML": 0.88,
-                "FinTech": 0.85,
-                "HealthTech": 0.79,
-                "EdTech": 0.72,
-                "CleanTech": 0.65,
-                "AgriTech": 0.31,
-                "LogiTech": 0.58,
-                "PropTech": 0.61,
-            },
-            "monthly_trends": {
-                "new_startups_registered": 23,
-                "mentor_sessions_completed": 156,
-                "grants_disbursed": 8,
-                "successful_market_entries": 4,
-                "ecosystem_connections_formed": 89,
-            },
-            "recommendations_for_operators": [
-                "Urgent: Recruit 3 new mentors in healthcare regulatory and AgriTech domains",
-                "Design simplified grant application for Seed-stage companies (< 30-day process)",
-                "Establish East Malaysia virtual mentorship programme in Q3 2025",
-                "Create Series B bridge mechanism with GLCs",
-                "Develop standardised BPOM navigation playbook to reduce expansion timeline",
-            ],
-            "reasoning": (
-                "The ecosystem health score of 72.4 reflects a maturing but imbalanced ecosystem. "
-                "Outcome quality (82.0) is strong — indicating good programme design — but mentor availability (68.0) "
-                "is the critical constraint. The mentor overload pattern, if unaddressed, will degrade outcome quality "
-                "within 6-9 months as the current cohort of high-performers reaches capacity. Geographic imbalance "
-                "represents both an equity concern and an untapped opportunity — East Malaysia startups show above-average "
-                "resilience metrics but receive disproportionately low support. Immediate governance priority: mentor recruitment."
-            ),
-        }
+        # --- Phase 1: deterministic analytics (always runs) ---
+        t0 = time.monotonic()
+        metrics = run_governance_analytics()
+        logger.debug("Analytics completed in %.0f ms", (time.monotonic() - t0) * 1000)
 
-        result = await self.gemini.generate_structured(
-            system_prompt=SYSTEM_PROMPT,
-            user_prompt=f"""Assess ecosystem governance health for context: {query}
+        # --- Phase 2: LLM interprets the metrics ---
+        prompt = _build_prompt(sanitized_query, metrics)
 
-Return JSON with: ecosystem_health_score (0-100), health_breakdown (dict of dimensions->score),
-governance_alerts (list with alert_id, type, severity, title, description, affected_entities list,
-recommendation, impact_score 0-1), ecosystem_bottlenecks list, sector_coverage (dict),
-monthly_trends (dict), recommendations_for_operators list, reasoning.""",
-            fallback_data=fallback,
+        raw_llm = await self.gemini.generate_structured(
+            system_prompt="",           # overridden by system_instruction
+            user_prompt=prompt,
+            fallback_data={},           # we own the fallback logic below
+            system_instruction=_SYSTEM_INSTRUCTION,
         )
 
-        return result
+        # --- Phase 3: merge, validate, return ---
+        if raw_llm:
+            merged = _merge_with_metrics(raw_llm, metrics)
+            validated = _validate(merged)
+            if validated:
+                logger.info(
+                    "GovernanceAgent completed via LLM (score=%.1f alerts=%d)",
+                    validated.ecosystem_health_score,
+                    len(validated.governance_alerts),
+                )
+                # mode='json' ensures enums are serialised as their string values
+                return validated.model_dump(mode="json")
+            logger.warning("LLM output failed Pydantic validation — using fallback")
+        else:
+            logger.warning("LLM returned empty output — using fallback")
+
+        # --- Fallback: pre-written narrative + live metrics ---
+        return _apply_live_metrics(GOVERNANCE_FALLBACK, metrics)
