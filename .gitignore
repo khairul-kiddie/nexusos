@@ -1,0 +1,43 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+env/
+venv/
+.venv/
+venv*/
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Byte-compiled / logs
+*.log
+
+# Environment
+.env
+.env.local
+backend/.env
+frontend/.env.local
+
+# VSCode
+.vscode/
+
+# Node
+node_modules/
+npm-debug.log
+.next/
+dist/
+build/
+
+# macOS
+.DS_Store
+
+# Docker
+docker-compose.override.yml
+
+# Python virtual env
+venv/
+.pytest_cache/
+
+# IDE
+.idea/
